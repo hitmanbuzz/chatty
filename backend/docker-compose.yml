@@ -1,0 +1,19 @@
+name: my-docker
+
+services:
+  database:
+    image: postgres:alpine
+    container_name: msg-app-postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=henthoibam@2005
+      - POSTGRES_DB=msg-app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+volumes:
+  pgdata:
