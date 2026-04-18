@@ -2,16 +2,22 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
-	"msg_app/internal/message"
-	"net"
+	"msg_app/internal/ws"
+	"net/http"
 	"os"
+	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Server struct {
-	hostIP   string
-	listener net.Listener
-	logger   *slog.Logger
+	hostIP string
+	logger *slog.Logger
+
+	server *gin.Engine
+	w      *ws.Websocket
 
 	groups      []uint
 	users       []uint
@@ -22,7 +28,8 @@ type Server struct {
 func Init(logger *slog.Logger) *Server {
 	return &Server{
 		hostIP:      os.Getenv("TCP_SERVER_IP"),
-		listener:    nil,
+		server:      gin.Default(),
+		w:           ws.Init(logger),
 		groups:      make([]uint, 0),
 		users:       make([]uint, 0),
 		group_count: 0,
@@ -32,57 +39,31 @@ func Init(logger *slog.Logger) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	listener, err := net.Listen("tcp", s.hostIP)
-	if err != nil {
-		s.logger.Error("failed to listen tcp", "error", err)
-		return err
+	s.server.GET("/echo", s.w.Echo)
+
+	server := &http.Server{
+		Addr:    s.hostIP,
+		Handler: s.server,
 	}
 
-	s.listener = listener
-	s.logger.Debug("server running", "ip", s.hostIP)
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+	}()
 
-	defer s.listener.Close()
+	select {
+	case err := <-serverErr:
+		return fmt.Errorf("server crashed: %w", err)
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
-	go s.handle_acception()
-
-	<-ctx.Done()
-
-	s.listener.Close()
-
-	return ctx.Err()
-}
-
-func (s *Server) GetUserCount() uint {
-	return s.user_count
-}
-
-func (s *Server) GetGroupCount() uint {
-	return s.group_count
-}
-
-func (s *Server) handle_acception() {
-	for {
-		conn, err := s.listener.Accept()
-		if err != nil {
-			s.logger.Error("error accepting connection", "error", err)
-			return
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("server forced to shutdown with error: %w", err)
 		}
 
-		go s.handle_connection(conn)
-	}
-}
-
-func (s *Server) handle_connection(conn net.Conn) {
-	defer conn.Close()
-
-	for {
-		msg := message.NewMsg(s.logger)
-		msg_data, err := msg.HandleMsg(&conn)
-		if err != nil {
-			s.logger.Error(err.Error())
-			return
-		}
-
-		s.logger.Info("message received", "ip", conn.RemoteAddr(), "message", msg_data)
+		return nil
 	}
 }
