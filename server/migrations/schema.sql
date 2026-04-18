@@ -22,7 +22,7 @@ CREATE TABLE groups (
 CREATE TABLE messages (
     msg_id SERIAL PRIMARY KEY,
     reply_msg_id INTEGER,
-    data TEXT,
+    content VARCHAR(100),
     create_time TIMESTAMPTZ NOT NULL,
     user_id INTEGER,
     CONSTRAINT msg_user_id

@@ -19,7 +19,7 @@ func Init(logger *slog.Logger) *Websocket {
 	}
 }
 
-func (w *Websocket) Echo(g *gin.Context) {
+func (w *Websocket) Messaging(g *gin.Context) {
 	conn, err := websocket.Accept(g.Writer, g.Request, nil)
 	if err != nil {
 		w.logger.Error("failed to accept websocket", "error", err)
@@ -43,4 +43,8 @@ func (w *Websocket) Echo(g *gin.Context) {
 	}
 
 	conn.Close(websocket.StatusNormalClosure, "server closing connection")
+}
+
+func (w *Websocket) LoginUser(g *gin.Context) {
+	// conn, err := websocket.Accept(g.Writer, g.Request, nil)
 }

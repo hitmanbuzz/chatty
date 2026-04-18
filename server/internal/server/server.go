@@ -39,7 +39,7 @@ func Init(logger *slog.Logger) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	s.server.GET("/echo", s.w.Echo)
+	s.server.GET("/echo", s.w.Messaging)
 
 	server := &http.Server{
 		Addr:    s.hostIP,
