@@ -3,8 +3,7 @@ package app
 import (
 	"context"
 	"log/slog"
-	"msg_app/internal/db"
-	"msg_app/internal/server/tcp_server"
+	"msg_app/internal/server"
 	"os"
 	"os/signal"
 
@@ -13,7 +12,7 @@ import (
 
 type App struct {
 	logger      *slog.Logger
-	chat_server *tcp_server.Server
+	chat_server *server.Server
 }
 
 func Init() *App {
@@ -24,7 +23,7 @@ func Init() *App {
 
 	return &App{
 		logger:      logger,
-		chat_server: tcp_server.Init(logger),
+		chat_server: server.Init(logger),
 	}
 }
 
