@@ -6,8 +6,6 @@ import (
 	"msg_app/internal/server"
 	"os"
 	"os/signal"
-
-	"golang.org/x/sync/errgroup"
 )
 
 type App struct {
@@ -31,15 +29,9 @@ func (a *App) Run() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	g, ctx := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		return a.chat_server.Run(ctx)
-	})
-
-	if err := g.Wait(); err != nil {
+	if err := a.chat_server.Run(ctx); err != nil {
 		a.logger.Error("application shutdown with error")
 	} else {
-		a.logger.Error("application shutdown gracefully")
+		a.logger.Info("application shutdown gracefully")
 	}
 }
