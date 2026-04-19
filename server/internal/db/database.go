@@ -9,31 +9,31 @@ import (
 )
 
 type Database struct {
-	pool   *pgxpool.Pool
+	Pool   *pgxpool.Pool
 	logger *slog.Logger
 	dbURL  string
 }
 
 func Init(logger *slog.Logger) *Database {
 	return &Database{
-		pool:   nil,
+		Pool:   nil,
 		logger: logger,
 		dbURL:  os.Getenv("DB_URL"),
 	}
 }
 
 func (d *Database) Run(ctx context.Context) error {
-	if d.pool == nil {
+	if d.Pool == nil {
 		pool, err := pgxpool.New(ctx, d.dbURL)
 		if err != nil {
 			d.logger.Error("unable to create connection postgres pool", "error", err)
 			return err
 		}
 
-		d.pool = pool
+		d.Pool = pool
 	}
 
-	defer d.pool.Close()
+	defer d.Pool.Close()
 
 	// handle context
 	<-ctx.Done()

@@ -3,7 +3,7 @@ MAIN_PKG_PATH=./cmd/main.go
 
 .PHONY: build
 build:
-	go build -o build/${BINARY_NAME} ${MAIN_PKG_PATH}
+	go build -trimpath -o build/${BINARY_NAME} ${MAIN_PKG_PATH}
 
 .PHONY: run
 run:
