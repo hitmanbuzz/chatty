@@ -44,7 +44,3 @@ func (w *Websocket) Messaging(g *gin.Context) {
 
 	conn.Close(websocket.StatusNormalClosure, "server closing connection")
 }
-
-func (w *Websocket) LoginUser(g *gin.Context) {
-	// conn, err := websocket.Accept(g.Writer, g.Request, nil)
-}

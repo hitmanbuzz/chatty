@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"msg_app/internal/db"
+	"msg_app/internal/user"
 	"msg_app/internal/ws"
 	"net/http"
 	"os"
@@ -16,8 +18,9 @@ type Server struct {
 	hostIP string
 	logger *slog.Logger
 
-	server *gin.Engine
-	w      *ws.Websocket
+	server   *gin.Engine
+	w        *ws.Websocket
+	database *db.Database
 
 	groups      []uint
 	users       []uint
@@ -30,6 +33,7 @@ func Init(logger *slog.Logger) *Server {
 		hostIP:      os.Getenv("TCP_SERVER_IP"),
 		server:      gin.Default(),
 		w:           ws.Init(logger),
+		database:    db.Init(logger),
 		groups:      make([]uint, 0),
 		users:       make([]uint, 0),
 		group_count: 0,
@@ -39,7 +43,7 @@ func Init(logger *slog.Logger) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	s.server.GET("/echo", s.w.Messaging)
+	s.Routes()
 
 	server := &http.Server{
 		Addr:    s.hostIP,
@@ -52,6 +56,8 @@ func (s *Server) Run(ctx context.Context) error {
 			serverErr <- err
 		}
 	}()
+
+	go s.database.Run(ctx)
 
 	select {
 	case err := <-serverErr:
@@ -66,4 +72,39 @@ func (s *Server) Run(ctx context.Context) error {
 
 		return nil
 	}
+}
+
+func (s *Server) Routes() {
+	s.server.GET("/echo", s.w.Messaging)
+
+	s.server.POST("/auth", func(ctx *gin.Context) {
+		var payload user.AuthPayload
+
+		if err := ctx.ShouldBind(&payload); err != nil {
+			ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			return
+		}
+
+		s.logger.Info("received from client", "username", payload.Username)
+
+		isExist, err := user.IsUserExist(s.database, payload.Username)
+		if err != nil {
+			s.logger.Error(err.Error())
+		} else {
+			switch isExist {
+			case true:
+				ctx.JSON(http.StatusOK, gin.H{"status": "user already exist with this username"})
+			case false:
+				id, err := user.CreateUser(s.database, payload.Username)
+				if err != nil {
+					s.logger.Error(err.Error())
+					ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+					return
+				}
+
+				s.logger.Info("user created", "id", id)
+				ctx.JSON(http.StatusOK, gin.H{"status": "user created successfully"})
+			}
+		}
+	})
 }
