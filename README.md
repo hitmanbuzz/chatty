@@ -2,8 +2,8 @@
 A kinda full fledged chat message app.
   
 ## Tech Stack:
-- **Go** (Backend)
-- **Svelte** (Frontend)
-- **Postgres** (Database)
+- Frontend (Client): **Not yet decided**
+- Backend (Server): **Go** (Golang)
+- Database: **Postgres**
 
-I push the `.env` file in `backend` because this is a side project and this project is meant to run locally so no harm in putting it here.
+I push the `.env` file in `` because this is a side project and this project is meant to run locally so no harm in putting it here.
