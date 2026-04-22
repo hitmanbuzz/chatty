@@ -1,7 +1,6 @@
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     user_name VARCHAR(50) NOT NULL UNIQUE,  
-    in_group BOOLEAN NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -32,5 +31,5 @@ CREATE TABLE messages (
     user_id INTEGER,
     CONSTRAINT msg_user_id
         FOREIGN KEY (user_id)
-        REFERENCES users(id)
+        REFERENCES users(id) ON DELETE CASCADE
 );

@@ -23,25 +23,34 @@ func Init(logger *slog.Logger) *Database {
 	}
 }
 
+func (d *Database) Connect(ctx context.Context) error {
+	if d.Pool != nil {
+		return nil
+	}
+
+	config, err := pgxpool.ParseConfig(d.dbURL)
+	if err != nil {
+		return err
+	}
+
+	// limit queries to 10 seconds
+	// https://www.postgresql.org/docs/current/runtime-config-client.html
+	config.ConnConfig.RuntimeParams["statement_timeout"] = "10000"
+
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		d.logger.Error("unable to create connection postgres pool", "error", err)
+		return err
+	}
+
+	d.Pool = pool
+	d.logger.Info("database connection", "status", "success")
+	return nil
+}
+
 func (d *Database) Run(ctx context.Context) error {
-	if d.Pool == nil {
-		config, err := pgxpool.ParseConfig(d.dbURL)
-		if err != nil {
-			return err
-		}
-
-		// limit queries to 5 seconds
-		// https://www.postgresql.org/docs/current/runtime-config-client.html
-		config.ConnConfig.RuntimeParams["statement_timeout"] = "5000"
-
-		pool, err := pgxpool.NewWithConfig(ctx, config)
-		if err != nil {
-			d.logger.Error("unable to create connection postgres pool", "error", err)
-			return err
-		}
-
-		d.Pool = pool
-		d.logger.Info("database connection", "status", "success")
+	if err := d.Connect(ctx); err != nil {
+		return err
 	}
 
 	<-ctx.Done()
