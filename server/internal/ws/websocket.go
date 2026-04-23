@@ -19,6 +19,10 @@ func Init(logger *slog.Logger) *Websocket {
 	}
 }
 
+func (w *Websocket) Logging() {
+
+}
+
 func (w *Websocket) Messaging(g *gin.Context) {
 	conn, err := websocket.Accept(g.Writer, g.Request, nil)
 	if err != nil {

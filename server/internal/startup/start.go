@@ -16,11 +16,13 @@ const (
 
 type Startup struct {
 	logger *slog.Logger
+	store  *storage.Storage
 }
 
-func Init(logger *slog.Logger) *Startup {
+func Init(logger *slog.Logger, store *storage.Storage) *Startup {
 	return &Startup{
 		logger: logger,
+		store:  store,
 	}
 }
 
@@ -50,7 +52,27 @@ func (s *Startup) Exec(database *db.Database, store *storage.Storage) error {
 		return err
 	}
 
+	users, err := u.LoadAllUsers(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, us := range users {
+		groupId, groupName, err := g.FetchUserGroup(ctx, us.Id)
+		if err != nil {
+			s.logger.Error(err.Error())
+			continue
+		}
+
+		err = s.store.InsertUser(us.Id, us.Username, groupId, groupName)
+		if err != nil {
+			s.logger.Error("failed to insert use to storage memory", "error", err)
+			continue
+		}
+	}
+
 	s.logger.Info("startup executed succesfully")
+	s.store.Logging()
 
 	return nil
 }

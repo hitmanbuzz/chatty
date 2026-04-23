@@ -64,3 +64,57 @@ func (g *Group) CreateGroup(pctx context.Context, owner_id int32, groupname stri
 
 	return groupid, nil
 }
+
+func (g *Group) GetGroupName(pctx context.Context, groupID int32) (string, error) {
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT group_name from groups
+		WHERE id = $1
+	`
+
+	var groupName string
+	err := g.database.Pool.QueryRow(ctx, query, groupID).Scan(&groupName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", fmt.Errorf("no group found, group id: %d", groupID)
+		}
+	}
+
+	return groupName, nil
+}
+
+// Return (groupID, groupName, err)
+func (g *Group) FetchUserGroup(pctx context.Context, userID int32) (int32, string, error) {
+	ctx, cancel := context.WithTimeout(pctx, 5*time.Second)
+	defer cancel()
+
+	query := `
+		SELECT group_id FROM group_members
+		WHERE user_id = $1
+	`
+
+	var groupID int32
+	err := g.database.Pool.QueryRow(ctx, query, userID).Scan(&groupID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			var username string
+			_ = g.database.Pool.QueryRow(ctx, "SELECT user_name from users WHERE id = $1", userID).Scan(&username)
+			return -1, "", fmt.Errorf("user is not part of this group [ user id: %d | username: %s ]", userID, username)
+		}
+
+		if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
+			if pgErr.Code == "23503" {
+				return -1, "", fmt.Errorf("invalid references: the user id doesn't exist")
+			}
+		}
+	}
+
+	groupName, err := g.GetGroupName(ctx, groupID)
+	if err != nil {
+		return groupID, "", err
+	}
+
+	return groupID, groupName, nil
+}

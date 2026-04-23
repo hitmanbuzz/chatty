@@ -12,11 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type authPayload struct {
-	Username  string `form:"username" binding:"required"`
-	Groupname string `form:"groupname" default:"default"`
-}
-
 type UserData struct {
 	Id       int32  `db:"id"`
 	Username string `db:"user_name"`
@@ -41,8 +36,7 @@ func (u *User) CreateUser(pctx context.Context, username string) (int32, error) 
 	query := `
 		INSERT INTO users (user_name)
 		VALUES($1)
-		ON CONFLICT (user_name) DO UPDATE
-		SET user_name = users.user_name
+		ON CONFLICT (user_name) DO NOTHING
 		RETURNING id
 	`
 	var userID int32
@@ -50,6 +44,12 @@ func (u *User) CreateUser(pctx context.Context, username string) (int32, error) 
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			err = u.database.Pool.QueryRow(ctx, "SELECT id FROM users WHERE user_name = $1", username).Scan(&userID)
+			if err != nil {
+				// could check if the user exist here aswell but I doubt it is needed for this project
+				return -1, err
+			}
+
 			u.logger.Info("user already exist", "username", username)
 			return userID, nil
 		}
@@ -77,6 +77,7 @@ func (u *User) LoadAllUsers(pctx context.Context) (map[string]UserData, error) {
 
 	users, err := pgx.CollectRows(rows, pgx.RowToStructByName[UserData])
 	if err != nil {
+		u.logger.Error("failed to collect all users rows from db")
 		return nil, err
 	}
 
@@ -118,9 +119,7 @@ func (u *User) JoinGroup(pctx context.Context, userId int32, groupId int32) erro
 func arrToMap(users []UserData) map[string]UserData {
 	result := make(map[string]UserData)
 
-	for i := range users {
-		user := users[i]
-
+	for _, user := range users {
 		result[user.Username] = UserData{
 			Id:       user.Id,
 			Username: user.Username,

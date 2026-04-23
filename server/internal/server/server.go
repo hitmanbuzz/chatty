@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"msg_app/internal/auth"
 	"msg_app/internal/db"
 	"msg_app/internal/startup"
 	"msg_app/internal/storage"
@@ -31,13 +32,15 @@ type Server struct {
 }
 
 func Init(logger *slog.Logger) *Server {
+	storage := storage.InitStorage(logger)
+
 	return &Server{
 		hostIP:      os.Getenv("TCP_SERVER_IP"),
 		server:      gin.Default(),
 		w:           ws.Init(logger),
 		database:    db.Init(logger),
-		storage:     storage.InitStorage(logger),
-		start:       startup.Init(logger),
+		storage:     storage,
+		start:       startup.Init(logger, storage),
 		group_count: 0,
 		user_count:  0,
 		logger:      logger,
@@ -97,10 +100,25 @@ func (s *Server) Exec() {
 }
 
 func (s *Server) Routes() {
-	s.server.GET("/echo", s.w.Messaging)
+	// for testing
+	s.server.GET("/user/:username", func(ctx *gin.Context) {
+		username := ctx.Param("username")
+
+		isUserOnline := s.storage.IsUserOnline(username)
+		ctx.JSON(http.StatusOK, gin.H{
+			"is_online": isUserOnline,
+		})
+	})
+
+	s.server.POST("/create-user", func(ctx *gin.Context) {
+		a := auth.NewLogin(s.logger, s.database)
+		a.SignupUser(ctx)
+	})
+
+	// s.server.GET("/echo", s.w.Messaging)
 
 	// s.server.POST("/auth", func(ctx *gin.Context) {
-	// 	u := user.Init(s.logger, s.database)
-	// 	u.AuthUser(ctx)
+	// 	a := auth.NewAuth(s.logger, s.database)
+	// 	a.Authenticate(ctx)
 	// })
 }

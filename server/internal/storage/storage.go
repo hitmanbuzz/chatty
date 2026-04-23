@@ -43,6 +43,10 @@ func (s *Storage) InsertUser(userID int32, username string, groupID int32, group
 	return nil
 }
 
+func (s *Storage) Logging() {
+	s.logger.Info("total users in storage", "count", len(s.Users))
+}
+
 func (s *Storage) IsUserOnline(username string) bool {
 	_, ok := s.Users[username]
 	if ok {
