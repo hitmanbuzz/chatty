@@ -12,12 +12,12 @@ import (
 )
 
 type SignupPayload struct {
-	Username string `form:"username" binding:"required"`
+	Username string `json:"username" binding:"required"`
 }
 
 type LoginPayload struct {
-	Username  string `form:"username" binding:"required"`
-	Groupname string `form:"groupname" default:"default"`
+	Username  string `json:"username" binding:"required"`
+	Groupname string `json:"groupname" default:"default"`
 }
 
 type Authenticate struct {
@@ -37,7 +37,7 @@ func (a *Authenticate) SignupUser(ctx *gin.Context) {
 
 	var payload SignupPayload
 
-	if err := ctx.ShouldBind(&payload); err != nil {
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
 		ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}

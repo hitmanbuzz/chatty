@@ -2,7 +2,7 @@
 A kinda full fledged chat message app.
   
 ## Tech Stack:
-- Frontend (Client): **Not yet decided**
+- Frontend (Client): **Solid JS**
 - Backend (Server): **Go** (Golang)
 - Database: **Postgres**
 
