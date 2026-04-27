@@ -36,15 +36,18 @@ func Init(logger *slog.Logger) *Server {
 	storage := storage.InitStorage(logger)
 
 	server := gin.Default()
+
+	// TODO: change rules in production
 	server.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST"},
-		AllowHeaders:     []string{"Origin", "Content-Type"},
-		AllowCredentials: true,
+		AllowAllOrigins: true,
+		// AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods: []string{"GET", "POST"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
+		// AllowCredentials: true,
 	}))
 
 	return &Server{
-		hostIP:      os.Getenv("TCP_SERVER_IP"),
+		hostIP:      os.Getenv("SERVER_IP"),
 		server:      server,
 		w:           ws.Init(logger),
 		database:    db.Init(logger),
