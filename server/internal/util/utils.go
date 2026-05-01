@@ -2,6 +2,7 @@ package util
 
 const MAX_MSG_BYTE = 1024
 const MAX_MSG_LEN = 100
+const DAY_SECS = 86400
 
 type MessageStat int
 

@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=henthoibam@2005
+      - POSTGRES_PASSWORD=yoho@2026
       - POSTGRES_DB=msg-app
     ports:
       - "5432:5432"

@@ -2,22 +2,20 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"msg_app/internal/db"
+	"msg_app/internal/storage"
 	"msg_app/internal/user"
 	"net/http"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
 
-type SignupPayload struct {
+type AuthPayload struct {
 	Username string `json:"username" binding:"required"`
-}
-
-type LoginPayload struct {
-	Username  string `json:"username" binding:"required"`
-	Groupname string `json:"groupname" default:"default"`
 }
 
 type Authenticate struct {
@@ -25,17 +23,17 @@ type Authenticate struct {
 	database *db.Database
 }
 
-func NewLogin(logger *slog.Logger, database *db.Database) *Authenticate {
+func NewAuth(logger *slog.Logger, database *db.Database) *Authenticate {
 	return &Authenticate{
 		logger:   logger,
 		database: database,
 	}
 }
 
-func (a *Authenticate) SignupUser(ctx *gin.Context) {
+func (a *Authenticate) Register(ctx *gin.Context) {
 	reqCtx := ctx.Request.Context()
 
-	var payload SignupPayload
+	var payload AuthPayload
 
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
 		ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -59,30 +57,44 @@ func (a *Authenticate) SignupUser(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "user created successfully"})
 }
 
-// func (a *Authenticate) LoginUser(ctx *gin.Context) {
-// 	reqCtx := ctx.Request.Context()
+func (a *Authenticate) LoginUser(ctx *gin.Context, store *storage.Storage) {
+	if store == nil {
+		a.logger.Error("storage is nil in authentication")
+		return
+	}
 
-// 	var payload LoginPayload
+	var payload AuthPayload
 
-// 	if err := ctx.ShouldBind(&payload); err != nil {
-// 		ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-// 		return
-// 	}
+	if err := ctx.ShouldBind(&payload); err != nil {
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
 
-// 	u := user.Init(a.logger, a.database)
+	u, found := store.Users[payload.Username]
+	if !found {
+		ctx.JSON(http.StatusNoContent, gin.H{"status": fmt.Sprintf("user with username %s not found", payload.Username)})
+		return
+	}
 
-// 	userid, err := u.CreateUser(reqCtx, payload.Username)
-// 	if err != nil {
-// 		if errors.Is(err, pgx.ErrNoRows) {
-// 			ctx.JSON(http.StatusOK, gin.H{"status": "user already exist with this username"})
-// 			return
-// 		}
+	// TODO: Implement a way to know a user is already login by using the startup storage
 
-// 		a.logger.Error(err.Error())
-// 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-// 		return
-// 	}
+	a.logger.Info("user authenticated successfully", "id", u.UserID, "username", payload.Username)
+	ctx.JSON(http.StatusOK, gin.H{"status": "user created successfully"})
+}
 
-// 	a.logger.Info("user authenticated successfully", "id", userid, "username", payload.Username)
-// 	ctx.JSON(http.StatusOK, gin.H{"status": "user created successfully"})
-// }
+func AuthRequired() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		s := sessions.Default(ctx)
+		userID := s.Get("userID")
+
+		if userID == nil {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "you must be logged in to access this area",
+			})
+			return
+		}
+
+		ctx.Set("currUserID", userID)
+		ctx.Next()
+	}
+}

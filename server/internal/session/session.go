@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"log/slog"
 	"msg_app/internal/db"
+	"msg_app/internal/util"
+	"net/http"
+	"os"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/postgres"
@@ -18,8 +21,8 @@ type Session struct {
 }
 
 func Init(logger *slog.Logger, database *db.Database, ginCtx *gin.Engine) *Session {
-	if database == nil || ginCtx == nil {
-		logger.Error("database or gin is nil")
+	if logger == nil || database == nil || ginCtx == nil {
+		logger.Error("logger or database or gin is nil")
 		return nil
 	}
 
@@ -31,19 +34,26 @@ func Init(logger *slog.Logger, database *db.Database, ginCtx *gin.Engine) *Sessi
 	}
 }
 
-func (s *Session) StoreSession() {
+func (s *Session) HandleSession() {
 	defer s.sqlDB.Close()
 
-	store, err := postgres.NewStore(s.sqlDB, []byte("secret-key"))
+	secret_key := os.Getenv("SESSION_KEY")
+	cookie_name := os.Getenv("CLIENT_COOKIE")
+
+	store, err := postgres.NewStore(s.sqlDB, []byte(secret_key))
 	if err != nil {
 		s.logger.Error("failed to create postgres session key store", "error", err.Error())
 		return
 	}
 
+	// modify it before production
 	store.Options(sessions.Options{
-		MaxAge: 86400 * 30, // 30 days
-		Path:   "/",
+		MaxAge:   util.DAY_SECS * 30, // 30 days
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
 	})
 
-	s.ginCtx.Use(sessions.Sessions("auth_session", store))
+	s.ginCtx.Use(sessions.Sessions(cookie_name, store))
 }

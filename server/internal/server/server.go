@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"msg_app/internal/auth"
 	"msg_app/internal/db"
+	"msg_app/internal/session"
 	"msg_app/internal/startup"
 	"msg_app/internal/storage"
 	"msg_app/internal/ws"
@@ -27,32 +28,35 @@ type Server struct {
 	database *db.Database
 	storage  *storage.Storage
 	start    *startup.Startup
+	sess     *session.Session
 
 	group_count uint
 	user_count  uint
 }
 
 func Init(logger *slog.Logger) *Server {
-	storage := storage.InitStorage(logger)
-
 	server := gin.Default()
+	storage := storage.InitStorage(logger)
+	database := db.Init(logger)
+	sess := session.Init(logger, database, server) // session
+	start := startup.Init(logger, storage)         // startup
+	w := ws.Init(logger)                           // websocket
 
-	// TODO: change rules in production
 	server.Use(cors.New(cors.Config{
-		AllowAllOrigins: true,
-		// AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods: []string{"GET", "POST"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept"},
-		// AllowCredentials: true,
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowCredentials: true,
 	}))
 
 	return &Server{
 		hostIP:      os.Getenv("SERVER_IP"),
 		server:      server,
-		w:           ws.Init(logger),
-		database:    db.Init(logger),
+		w:           w,
+		database:    database,
 		storage:     storage,
-		start:       startup.Init(logger, storage),
+		start:       start,
+		sess:        sess,
 		group_count: 0,
 		user_count:  0,
 		logger:      logger,
@@ -67,6 +71,11 @@ func (s *Server) Run(ctx context.Context) error {
 
 	if err := s.database.Connect(ctx); err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	if s.sess != nil {
+		s.sess.HandleSession()
+		s.logger.Info("session handling running in background")
 	}
 
 	s.Exec()
@@ -112,7 +121,6 @@ func (s *Server) Exec() {
 }
 
 func (s *Server) Routes() {
-	// for testing
 	s.server.GET("/user/:username", func(ctx *gin.Context) {
 		username := ctx.Param("username")
 
@@ -122,10 +130,21 @@ func (s *Server) Routes() {
 		})
 	})
 
-	s.server.POST("/create-user", func(ctx *gin.Context) {
-		a := auth.NewLogin(s.logger, s.database)
-		a.SignupUser(ctx)
+	s.server.POST("/register", func(ctx *gin.Context) {
+		a := auth.NewAuth(s.logger, s.database)
+		a.Register(ctx)
 	})
+
+	s.server.POST("/login", func(ctx *gin.Context) {
+		a := auth.NewAuth(s.logger, s.database)
+		a.LoginUser(ctx, s.storage)
+	})
+
+	protected := s.server.Group("/api")
+	protected.Use(auth.AuthRequired())
+	{
+		protected.GET("/chat")
+	}
 
 	// s.server.GET("/echo", s.w.Messaging)
 
