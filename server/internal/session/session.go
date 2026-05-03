@@ -48,8 +48,8 @@ func (s *Session) HandleSession() {
 
 	// modify it before production
 	store.Options(sessions.Options{
-		MaxAge:   util.DAY_SECS * 30, // 30 days
 		Path:     "/",
+		MaxAge:   util.DAY_SECS * 30, // 30 days
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"msg_app/internal/db"
+	"msg_app/internal/session"
 	"msg_app/internal/storage"
 	"msg_app/internal/user"
 	"net/http"
@@ -21,6 +22,7 @@ type AuthPayload struct {
 type Authenticate struct {
 	logger   *slog.Logger
 	database *db.Database
+	sess     *session.Session
 }
 
 func NewAuth(logger *slog.Logger, database *db.Database) *Authenticate {
@@ -30,13 +32,14 @@ func NewAuth(logger *slog.Logger, database *db.Database) *Authenticate {
 	}
 }
 
+// TODO: handle username length limit
 func (a *Authenticate) Register(ctx *gin.Context) {
 	reqCtx := ctx.Request.Context()
 
 	var payload AuthPayload
 
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
-		ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -44,7 +47,7 @@ func (a *Authenticate) Register(ctx *gin.Context) {
 	userID, err := u.CreateUser(reqCtx, payload.Username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			ctx.JSON(http.StatusOK, gin.H{"status": "user already exist with this username"})
+			ctx.JSON(http.StatusFound, gin.H{"status": "user already exist with this username"})
 			return
 		}
 
@@ -57,6 +60,7 @@ func (a *Authenticate) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "user created successfully"})
 }
 
+// TODO: handle username length limit
 func (a *Authenticate) LoginUser(ctx *gin.Context, store *storage.Storage) {
 	if store == nil {
 		a.logger.Error("storage is nil in authentication")
@@ -66,20 +70,43 @@ func (a *Authenticate) LoginUser(ctx *gin.Context, store *storage.Storage) {
 	var payload AuthPayload
 
 	if err := ctx.ShouldBind(&payload); err != nil {
-		ctx.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	store.Lock()
 	u, found := store.Users[payload.Username]
 	if !found {
-		ctx.JSON(http.StatusNoContent, gin.H{"status": fmt.Sprintf("user with username %s not found", payload.Username)})
+		store.Unlock()
+		ctx.JSON(http.StatusNotFound, gin.H{"status": fmt.Sprintf("user with username %s not found", payload.Username)})
 		return
 	}
 
-	// TODO: Implement a way to know a user is already login by using the startup storage
+	if u.IsOnline {
+		store.Unlock()
+		ctx.JSON(http.StatusConflict, gin.H{"error": "user is already connected to another device"})
+		return
+	}
 
-	a.logger.Info("user authenticated successfully", "id", u.UserID, "username", payload.Username)
-	ctx.JSON(http.StatusOK, gin.H{"status": "user created successfully"})
+	store.Users[u.Username].IsOnline = true
+	store.Unlock()
+
+	session := sessions.Default(ctx)
+	session.Clear()
+
+	session.Set("userID", u.UserID)
+	session.Set("username", u.Username)
+
+	if err := session.Save(); err != nil {
+		store.Lock()
+		store.Users[u.Username].IsOnline = false
+		store.Unlock()
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create session"})
+		return
+	}
+
+	a.logger.Info("user authenticated successfully", "id", u.UserID, "username", u.Username)
+	ctx.JSON(http.StatusOK, gin.H{"status": "login successfully", "user": u.Username})
 }
 
 func AuthRequired() gin.HandlerFunc {

@@ -58,7 +58,6 @@ func (u *User) CreateUser(pctx context.Context, username string) (int32, error) 
 	}
 
 	u.logger.Info("new user created", "id", userID)
-
 	return userID, nil
 }
 

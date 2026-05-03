@@ -29,9 +29,6 @@ type Server struct {
 	storage  *storage.Storage
 	start    *startup.Startup
 	sess     *session.Session
-
-	group_count uint
-	user_count  uint
 }
 
 func Init(logger *slog.Logger) *Server {
@@ -50,16 +47,14 @@ func Init(logger *slog.Logger) *Server {
 	}))
 
 	return &Server{
-		hostIP:      os.Getenv("SERVER_IP"),
-		server:      server,
-		w:           w,
-		database:    database,
-		storage:     storage,
-		start:       start,
-		sess:        sess,
-		group_count: 0,
-		user_count:  0,
-		logger:      logger,
+		hostIP:   os.Getenv("SERVER_IP"),
+		server:   server,
+		w:        w,
+		database: database,
+		storage:  storage,
+		start:    start,
+		sess:     sess,
+		logger:   logger,
 	}
 }
 
@@ -73,10 +68,12 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	if s.sess != nil {
-		s.sess.HandleSession()
-		s.logger.Info("session handling running in background")
+	if s.sess == nil {
+		return fmt.Errorf("session manager is nil")
 	}
+
+	s.sess.HandleSession()
+	s.logger.Info("session handling running in background")
 
 	s.Exec()
 	s.Routes()
