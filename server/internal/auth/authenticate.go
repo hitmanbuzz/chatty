@@ -8,6 +8,7 @@ import (
 	"msg_app/internal/session"
 	"msg_app/internal/storage"
 	"msg_app/internal/user"
+	"msg_app/internal/util"
 	"net/http"
 
 	"github.com/gin-contrib/sessions"
@@ -32,7 +33,6 @@ func NewAuth(logger *slog.Logger, database *db.Database) *Authenticate {
 	}
 }
 
-// TODO: handle username length limit
 func (a *Authenticate) Register(ctx *gin.Context) {
 	reqCtx := ctx.Request.Context()
 
@@ -40,6 +40,11 @@ func (a *Authenticate) Register(ctx *gin.Context) {
 
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(payload.Username) > util.MAX_USER_LEN {
+		ctx.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "username length is more than 24"})
 		return
 	}
 
@@ -60,8 +65,7 @@ func (a *Authenticate) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "user created successfully"})
 }
 
-// TODO: handle username length limit
-func (a *Authenticate) LoginUser(ctx *gin.Context, store *storage.Storage) {
+func (a *Authenticate) Login(ctx *gin.Context, store *storage.Storage) {
 	if store == nil {
 		a.logger.Error("storage is nil in authentication")
 		return
@@ -69,8 +73,13 @@ func (a *Authenticate) LoginUser(ctx *gin.Context, store *storage.Storage) {
 
 	var payload AuthPayload
 
-	if err := ctx.ShouldBind(&payload); err != nil {
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(payload.Username) > util.MAX_USER_LEN {
+		ctx.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "username length is more than 24"})
 		return
 	}
 

@@ -47,7 +47,7 @@ func (s *Startup) Exec(database *db.Database, store *storage.Storage) error {
 		return err
 	}
 
-	err = store.InsertUser(userId, DEFAULT_SERVER_OWNER, groupId, DEFAULT_SERVER_NAME)
+	err = store.InsertUser(userId, DEFAULT_SERVER_OWNER)
 	if err != nil {
 		return err
 	}
@@ -58,13 +58,7 @@ func (s *Startup) Exec(database *db.Database, store *storage.Storage) error {
 	}
 
 	for _, us := range users {
-		groupId, groupName, err := g.FetchUserGroup(ctx, us.Id)
-		if err != nil {
-			s.logger.Error(err.Error())
-			continue
-		}
-
-		err = s.store.InsertUser(us.Id, us.Username, groupId, groupName)
+		err = s.store.InsertUser(us.Id, us.Username)
 		if err != nil {
 			s.logger.Error("failed to insert use to storage memory", "error", err)
 			continue

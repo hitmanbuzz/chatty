@@ -7,12 +7,8 @@ import (
 )
 
 type LocalUser struct {
-	Username  string
-	Groupname string
-
-	UserID  int32
-	GroupID int32
-
+	Username string
+	UserID   int32
 	IsOnline bool
 }
 
@@ -30,7 +26,7 @@ func InitStorage(logger *slog.Logger) *Storage {
 	}
 }
 
-func (s *Storage) InsertUser(userID int32, username string, groupID int32, groupname string) error {
+func (s *Storage) InsertUser(userID int32, username string) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -40,11 +36,9 @@ func (s *Storage) InsertUser(userID int32, username string, groupID int32, group
 	}
 
 	s.Users[username] = &LocalUser{
-		Username:  username,
-		Groupname: groupname,
-		UserID:    userID,
-		GroupID:   groupID,
-		IsOnline:  false,
+		Username: username,
+		UserID:   userID,
+		IsOnline: false,
 	}
 
 	s.logger.Info("user inserted into storage memory", "name", username)

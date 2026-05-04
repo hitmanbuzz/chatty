@@ -134,7 +134,7 @@ func (s *Server) Routes() {
 
 	s.server.POST("/login", func(ctx *gin.Context) {
 		a := auth.NewAuth(s.logger, s.database)
-		a.LoginUser(ctx, s.storage)
+		a.Login(ctx, s.storage)
 	})
 
 	protected := s.server.Group("/api")
